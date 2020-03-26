@@ -59,14 +59,26 @@ METHOD(xof_t, get_type, ext_out_function_t,
 METHOD(xof_t, get_bytes, bool,
 	private_xof_t *this, size_t out_len, uint8_t *buffer)
 {
-	return EVP_DigestFinalXOF(this->ctx, buffer, out_len) == 1;
+	bool success = FALSE;
+
+	if (this->ctx)
+	{
+		success = EVP_DigestFinalXOF(this->ctx, buffer, out_len) == 1;
+		EVP_MD_CTX_free(this->ctx);
+		this->ctx = NULL;
+	}
+	else
+	{
+		DBG1(DBG_LIB, "generating bytes from XOF only supported once per seed");
+	}
+	return success;
 }
 
 METHOD(xof_t, allocate_bytes, bool,
 	private_xof_t *this, size_t out_len, chunk_t *chunk)
 {
 	*chunk = chunk_alloc(out_len);
-	return EVP_DigestFinalXOF(this->ctx, chunk->ptr, out_len) == 1;
+	return get_bytes(this, out_len, chunk->ptr);
 }
 
 METHOD(xof_t, get_block_size, size_t,
@@ -84,6 +96,8 @@ METHOD(xof_t, get_seed_size, size_t,
 METHOD(xof_t, set_seed, bool,
 	private_xof_t *this, chunk_t seed)
 {
+	EVP_MD_CTX_free(this->ctx);
+	this->ctx = EVP_MD_CTX_new();
 	return EVP_DigestInit_ex(this->ctx, this->md, NULL) == 1 &&
 		   EVP_DigestUpdate(this->ctx, seed.ptr, seed.len) == 1;
 }
@@ -127,7 +141,6 @@ xof_t *openssl_xof_create(ext_out_function_t algorithm)
 		},
 		.algorithm = algorithm,
 		.md = md,
-		.ctx = EVP_MD_CTX_new(),
 	);
 	return &this->public;
 }
