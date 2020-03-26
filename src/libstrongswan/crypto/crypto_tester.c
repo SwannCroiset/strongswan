@@ -1073,10 +1073,11 @@ static u_int bench_xof(private_crypto_tester_t *this,
 		start_timing(&start);
 		while (end_timing(&start) < this->bench_time)
 		{
-			if (xof->get_bytes(xof, xof->get_block_size(xof), bytes))
+			if (!xof->get_bytes(xof, xof->get_block_size(xof), bytes))
 			{
-				runs++;
+				break;
 			}
+			runs++;
 		}
 		xof->destroy(xof);
 
